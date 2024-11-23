@@ -1,4 +1,4 @@
-package config
+package grpc_config
 
 type Config struct {
 	ServiceName string `envconfig:"NAME" required:"true"`
