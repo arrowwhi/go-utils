@@ -1,4 +1,4 @@
-module go-utils
+module github.com/arrowwhi/go-utils
 
 go 1.23.3
 

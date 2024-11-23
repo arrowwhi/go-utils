@@ -6,7 +6,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	pb "grpcserver/test/proto"
+	pb "github.com/arrowwhi/go-utils/grpcserver/test/proto"
 )
 
 type Service struct {

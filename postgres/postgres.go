@@ -3,8 +3,8 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"github.com/arrowwhi/go-utils/postgres/config"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"go-utils/postgres/config"
 
 	_ "github.com/jackc/pgx/v5"
 )

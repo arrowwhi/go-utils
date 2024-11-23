@@ -2,9 +2,9 @@ package interceptors
 
 import (
 	"context"
+	"github.com/arrowwhi/go-utils/grpcserver/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
-	"grpcserver/metrics"
 )
 
 func MetricsMiddleware(

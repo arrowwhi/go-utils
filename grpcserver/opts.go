@@ -1,8 +1,8 @@
 package grpcserver
 
 import (
+	"github.com/arrowwhi/go-utils/grpcserver/handler_adapter"
 	"google.golang.org/grpc"
-	"grpcserver/handler_adapter"
 )
 
 type options struct {

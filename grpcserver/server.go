@@ -3,10 +3,10 @@ package grpcserver
 import (
 	"context"
 	"fmt"
+	"github.com/arrowwhi/go-utils/grpcserver/interceptors"
+	"github.com/arrowwhi/go-utils/grpcserver/metrics"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/reflection"
-	"grpcserver/interceptors"
-	"grpcserver/metrics"
 	"net"
 
 	"google.golang.org/grpc"
