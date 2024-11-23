@@ -3,11 +3,10 @@ package grpcserver
 import (
 	"context"
 	"fmt"
-	"go-utils/grpcserver/gateway"
-	"go-utils/grpcserver/interceptors"
-	"go-utils/grpcserver/metrics"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/reflection"
+	"grpcserver/interceptors"
+	"grpcserver/metrics"
 	"net"
 
 	"google.golang.org/grpc"
@@ -75,15 +74,6 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	reflection.Register(s.grpcServer)
-
-	// Запуск gRPC-Gateway в отдельной горутине
-	gatewayServer := gateway.NewGateway(*s.logger, s.adapters)
-	go func() {
-		//todo
-		if err := gatewayServer.Start(ctx, s.httpAddress, s.grpcAddress); err != nil {
-			panic(fmt.Sprintf("start HTTP-Gateway: %v", err))
-		}
-	}()
 	return s.grpcServer.Serve(listener)
 }
 

@@ -1,12 +1,12 @@
 package grpcserver
 
 import (
-	"go-utils/grpcserver/adapter"
 	"google.golang.org/grpc"
+	"grpcserver/handler_adapter"
 )
 
 type options struct {
-	adapters                    []adapter.ImplementationAdapter
+	adapters                    []handler_adapter.ImplementationAdapter
 	grpcUnaryServerInterceptors []grpc.UnaryServerInterceptor
 	grpcAddress                 string
 	httpAddress                 string
@@ -16,7 +16,7 @@ type option func(o *options)
 
 func (o option) apply(os *options) { o(os) }
 
-func WithImplementationAdapters(adapters ...adapter.ImplementationAdapter) EntrypointOption {
+func WithImplementationAdapters(adapters ...handler_adapter.ImplementationAdapter) EntrypointOption {
 	return option(func(o *options) { o.adapters = append(o.adapters, adapters...) })
 }
 

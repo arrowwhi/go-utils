@@ -1,4 +1,4 @@
-package adapter
+package handler_adapter
 
 import (
 	"context"

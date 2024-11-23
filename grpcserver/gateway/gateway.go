@@ -2,117 +2,83 @@ package gateway
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"go-utils/grpcserver/adapter"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/encoding/protojson"
 	"net/http"
-	"time"
 
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// Option defines a function type for configuring the Gateway.
+type Option func(*Gateway)
+
+// Gateway represents the HTTP gateway for the gRPC server.
 type Gateway struct {
-	logger     zap.Logger
-	adapters   []adapter.ImplementationAdapter
-	gatewayMux *http.ServeMux
+	grpcAddress string
+	httpAddress string
+	serviceName string
+	logger      *zap.Logger
+	handlers    []func(context.Context, *runtime.ServeMux, string, []grpc.DialOption) error
+	dialOptions []grpc.DialOption
 }
 
-func NewGateway(logger zap.Logger, adapters []adapter.ImplementationAdapter) *Gateway {
-	return &Gateway{
-		logger:     logger,
-		adapters:   adapters,
-		gatewayMux: http.NewServeMux(),
+// NewGateway creates a new Gateway instance with the provided options.
+func NewGateway(grpcAddress, httpAddress, serviceName string, logger *zap.Logger, opts ...Option) *Gateway {
+	g := &Gateway{
+		grpcAddress: grpcAddress,
+		httpAddress: httpAddress,
+		serviceName: serviceName,
+		logger:      logger,
+	}
+
+	for _, opt := range opts {
+		opt(g)
+	}
+
+	return g
+}
+
+// WithHandler adds a gRPC handler to the Gateway.
+func WithHandler(registerHandler func(context.Context, *runtime.ServeMux, string, []grpc.DialOption) error) Option {
+	return func(g *Gateway) {
+		g.handlers = append(g.handlers, registerHandler)
 	}
 }
 
-func (g *Gateway) Start(ctx context.Context, httpPort string, grpcPort string) error {
-	httpUrl := httpPort
-	grpcUrl := grpcPort
-
-	conn, err := grpc.NewClient(grpcUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return err
+// WithDialOptions sets custom gRPC dial options for the Gateway.
+func WithDialOptions(dialOpts ...grpc.DialOption) Option {
+	return func(g *Gateway) {
+		g.dialOptions = append(g.dialOptions, dialOpts...)
 	}
-	//closer.Add(conn.Close) todo
+}
 
-	defaultMarshallerOption := runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
-		MarshalOptions: protojson.MarshalOptions{
-			UseProtoNames:   false,
-			EmitUnpopulated: true,
-		},
-		UnmarshalOptions: protojson.UnmarshalOptions{
-			DiscardUnknown: true,
-		},
-	})
+// Start launches the HTTP gateway server.
+func (g *Gateway) Start(ctx context.Context) error {
+	mux := runtime.NewServeMux()
 
-	opts := []runtime.ServeMuxOption{
-		defaultMarshallerOption,
-		//runtime.WithErrorHandler(httpError.HTTPErrorHandler),
+	// Use provided dial options or default to insecure credentials
+	var dialOpts []grpc.DialOption
+	if len(g.dialOptions) > 0 {
+		dialOpts = g.dialOptions
+	} else {
+		dialOpts = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 	}
 
-	//opts = append(opts, g.serverMuxOptions...)
-
-	//opts = append(opts,
-	//	runtime.WithIncomingHeaderMatcher(func(s string) (string, bool) {
-	//		if g.incomingHeaderMatcherFunc != nil {
-	//			if header, ok := g.incomingHeaderMatcherFunc(s); ok {
-	//				return header, ok
-	//			}
-	//		}
-	//
-	//		return defaultIncomingHeaderMatcher(s)
-	//	}),
-	//	runtime.WithOutgoingHeaderMatcher(func(s string) (string, bool) {
-	//		if g.outgoingHeaderMatcherFunc != nil {
-	//			if header, ok := g.outgoingHeaderMatcherFunc(s); ok {
-	//				return header, ok
-	//			}
-	//		}
-	//
-	//		return defaultOutgoingHeaderMatcher(s)
-	//	}),
-	//	runtime.WithHealthzEndpoint(health.NewHealthClient(conn)))
-
-	gwmux := runtime.NewServeMux(
-		opts...,
-	)
-
-	for _, impl := range g.adapters {
-		if err := impl.RegisterHandler(ctx, gwmux, conn); err != nil {
-			return err
+	// Register all handlers
+	for _, handler := range g.handlers {
+		if err := handler(ctx, mux, g.grpcAddress, dialOpts); err != nil {
+			return fmt.Errorf("failed to register handler: %w", err)
 		}
 	}
 
-	mux := http.NewServeMux()
+	// Start the HTTP server
+	g.logger.Info("Starting HTTP gateway",
+		zap.String("address", g.httpAddress),
+		zap.String("grpc_address", g.grpcAddress),
+		zap.String("service_name", g.serviceName),
+	)
 
-	//g.registerSwaggerHandler(mux)
-
-	mux.Handle("/", gwmux)
-
-	var httpHandler http.Handler
-	httpHandler = mux
-
-	//if g.corsEnabled {
-	//	httpHandler = cors.New(g.corsOptions).Handler(mux)
-	//}
-
-	httpServer := &http.Server{
-		Addr:              httpUrl,
-		Handler:           httpHandler,
-		ReadHeaderTimeout: time.Minute,
-	}
-
-	g.logger.Info(fmt.Sprintf("gRPC GW starting on address - %s", httpUrl))
-
-	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		g.logger.Error(fmt.Sprintf("failed to start http gateway server: %v", err))
-		return err
-	}
-
-	return nil
-
+	return http.ListenAndServe(g.httpAddress, mux)
 }
