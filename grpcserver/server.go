@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"context"
 	"fmt"
+	"github.com/arrowwhi/go-utils/grpcserver/gateway"
 	"github.com/arrowwhi/go-utils/grpcserver/interceptors"
 	"github.com/arrowwhi/go-utils/grpcserver/metrics"
 	"go.uber.org/zap"
@@ -10,19 +11,19 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
+
+	grpcconfig "github.com/arrowwhi/go-utils/grpcserver/config"
 )
 
 type Server struct {
 	options
 	metricsPort string
 	logger      *zap.Logger
-	grpcAddress string
-	httpAddress string
-	serviceName string
 	grpcServer  *grpc.Server
+	config      grpcconfig.Config
 }
 
-func NewServer(grpcAddress, httpAddress, serviceName, metricsPort string, logger *zap.Logger, opts ...EntrypointOption) (*Server, error) {
+func NewServer(serverConfig grpcconfig.Config, logger *zap.Logger, opts ...EntrypointOption) (*Server, error) {
 	o := options{}
 
 	for _, opt := range opts {
@@ -30,19 +31,16 @@ func NewServer(grpcAddress, httpAddress, serviceName, metricsPort string, logger
 	}
 
 	return &Server{
-		logger:      logger,
-		options:     o,
-		metricsPort: metricsPort,
-		grpcAddress: fmt.Sprintf("localhost:%s", grpcAddress),
-		httpAddress: fmt.Sprintf("localhost:%s", httpAddress),
-		serviceName: serviceName,
+		logger:  logger,
+		options: o,
+		config:  serverConfig,
 	}, nil
 }
 
 // Start запускает gRPC сервер и начинает прослушивание входящих запросов.
 func (s *Server) Start(ctx context.Context) error {
 
-	ints := []grpc.ServerOption{grpc.ChainUnaryInterceptor(interceptors.MetricsMiddleware(s.serviceName))}
+	ints := []grpc.ServerOption{grpc.ChainUnaryInterceptor(interceptors.MetricsMiddleware(s.config.ServiceName))}
 
 	for _, v := range s.grpcUnaryServerInterceptors {
 		ints = append(ints, grpc.ChainUnaryInterceptor(v))
@@ -64,7 +62,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	//---
 
-	listener, err := net.Listen("tcp", fmt.Sprintf(s.grpcAddress))
+	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", s.config.GRPCPort))
 	if err != nil {
 		return fmt.Errorf("failed to listen on port %v", err)
 	}
@@ -74,6 +72,30 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	reflection.Register(s.grpcServer)
+
+	var gatewayOptions []gateway.Option
+	for _, v := range s.adapters {
+		gatewayOptions = append(gatewayOptions, gateway.WithHandler(v.RegisterHandler))
+	}
+
+	gw := gateway.NewGateway(
+		s.config,
+		s.logger,
+		gatewayOptions...,
+	)
+
+	go func() {
+		s.logger.Info("Starting HTTP gateway",
+			zap.String("address", s.config.GatewayPort),
+			zap.String("grpc_address", s.config.GRPCPort),
+			zap.String("service_name", s.config.ServiceName),
+		)
+		if err := gw.Start(ctx); err != nil {
+			s.logger.Error("Failed to start HTTP gateway", zap.Error(err))
+			// Обработка ошибки при необходимости
+		}
+	}()
+
 	return s.grpcServer.Serve(listener)
 }
 

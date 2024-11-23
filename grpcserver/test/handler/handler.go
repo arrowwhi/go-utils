@@ -31,5 +31,5 @@ func (s *Service) RegisterServer(server *grpc.Server) {
 }
 
 func (s *Service) RegisterHandler(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn) error {
-	return pb.RegisterUsersServiceHandlerFromEndpoint(ctx, mux, "*", []grpc.DialOption{})
+	return pb.RegisterUsersServiceHandler(ctx, mux, conn)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/arrowwhi/go-utils/grpcserver/test/config"
 	"github.com/arrowwhi/go-utils/grpcserver/test/handler"
 	"github.com/arrowwhi/go-utils/logger"
+	"go.uber.org/zap"
 	"log"
 	"os"
 	"os/signal"
@@ -22,13 +23,10 @@ func main() {
 	}
 
 	// Инициализация логгера
-	zapLogger := logger.NewClientZapLogger(cfg.LogLevel, cfg.ServiceName)
+	zapLogger := logger.NewClientZapLogger(cfg.LogLevel, cfg.ServerConfig.ServiceName)
 
 	srv, err := grpcserver.NewServer(
-		cfg.GRPCPort,
-		cfg.GatewayPort,
-		cfg.ServiceName,
-		cfg.PrometheusPort,
+		cfg.ServerConfig,
 		zapLogger,
 		grpcserver.WithImplementationAdapters(
 			handler.New(zapLogger),
@@ -41,6 +39,8 @@ func main() {
 	// Обработка системных сигналов для корректного завершения работы
 	quit := setupSignalChannel()
 	serverErrors := make(chan error, 1)
+
+	zapLogger.Info("Starting gRPC server", zap.String("gRPC port", cfg.ServerConfig.GRPCPort))
 
 	// Запуск gRPC сервера в горутине
 	go func() {
@@ -59,8 +59,6 @@ func main() {
 	zapLogger.Info("Shutting down gRPC server gracefully...")
 	srv.Stop()
 	zapLogger.Info("gRPC server stopped")
-	return
-
 }
 
 func setupSignalChannel() chan os.Signal {

@@ -2,8 +2,11 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	grpc_config "github.com/arrowwhi/go-utils/grpcserver/config"
 	"net/http"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"go.uber.org/zap"
@@ -16,21 +19,17 @@ type Option func(*Gateway)
 
 // Gateway represents the HTTP gateway for the gRPC server.
 type Gateway struct {
-	grpcAddress string
-	httpAddress string
-	serviceName string
-	logger      *zap.Logger
-	handlers    []func(context.Context, *runtime.ServeMux, string, []grpc.DialOption) error
-	dialOptions []grpc.DialOption
+	ServerConfig grpc_config.Config
+	logger       *zap.Logger
+	handlers     []func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn) error
+	dialOptions  []grpc.DialOption
 }
 
 // NewGateway creates a new Gateway instance with the provided options.
-func NewGateway(grpcAddress, httpAddress, serviceName string, logger *zap.Logger, opts ...Option) *Gateway {
+func NewGateway(ServerConfig grpc_config.Config, logger *zap.Logger, opts ...Option) *Gateway {
 	g := &Gateway{
-		grpcAddress: grpcAddress,
-		httpAddress: httpAddress,
-		serviceName: serviceName,
-		logger:      logger,
+		ServerConfig: ServerConfig,
+		logger:       logger,
 	}
 
 	for _, opt := range opts {
@@ -41,7 +40,7 @@ func NewGateway(grpcAddress, httpAddress, serviceName string, logger *zap.Logger
 }
 
 // WithHandler adds a gRPC handler to the Gateway.
-func WithHandler(registerHandler func(context.Context, *runtime.ServeMux, string, []grpc.DialOption) error) Option {
+func WithHandler(registerHandler func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn) error) Option {
 	return func(g *Gateway) {
 		g.handlers = append(g.handlers, registerHandler)
 	}
@@ -56,29 +55,49 @@ func WithDialOptions(dialOpts ...grpc.DialOption) Option {
 
 // Start launches the HTTP gateway server.
 func (g *Gateway) Start(ctx context.Context) error {
-	mux := runtime.NewServeMux()
-
-	// Use provided dial options or default to insecure credentials
-	var dialOpts []grpc.DialOption
-	if len(g.dialOptions) > 0 {
-		dialOpts = g.dialOptions
-	} else {
-		dialOpts = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	conn, err := grpc.NewClient(fmt.Sprintf("localhost:%s", g.ServerConfig.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return err
 	}
+	//closer.Add(conn.Close) todo
 
-	// Register all handlers
-	for _, handler := range g.handlers {
-		if err := handler(ctx, mux, g.grpcAddress, dialOpts); err != nil {
-			return fmt.Errorf("failed to register handler: %w", err)
+	gwmux := runtime.NewServeMux(
+	//opts...,
+	)
+
+	for _, impl := range g.handlers {
+		if err := impl(ctx, gwmux, conn); err != nil {
+			return err
 		}
 	}
 
+	mux := http.NewServeMux()
+
+	//g.registerSwaggerHandler(mux)
+
+	mux.Handle("/", gwmux)
+
+	var httpHandler http.Handler
+	httpHandler = mux
+
 	// Start the HTTP server
 	g.logger.Info("Starting HTTP gateway",
-		zap.String("address", g.httpAddress),
-		zap.String("grpc_address", g.grpcAddress),
-		zap.String("service_name", g.serviceName),
+		zap.String("address", g.ServerConfig.GatewayPort),
+		zap.String("service_name", g.ServerConfig.ServiceName),
 	)
 
-	return http.ListenAndServe(g.httpAddress, mux)
+	httpServer := &http.Server{
+		Addr:              fmt.Sprintf("localhost:%s", g.ServerConfig.GatewayPort),
+		Handler:           httpHandler,
+		ReadHeaderTimeout: time.Minute,
+	}
+
+	g.logger.Info(fmt.Sprintf("gRPC GW starting on address - %s", g.ServerConfig.GatewayPort))
+
+	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		g.logger.Error(fmt.Sprintf("failed to start http gateway server: %v", err))
+		return err
+	}
+
+	return nil
 }

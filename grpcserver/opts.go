@@ -8,8 +8,6 @@ import (
 type options struct {
 	adapters                    []handler_adapter.ImplementationAdapter
 	grpcUnaryServerInterceptors []grpc.UnaryServerInterceptor
-	grpcAddress                 string
-	httpAddress                 string
 }
 
 type option func(o *options)
@@ -24,4 +22,8 @@ func WithGrpcUnaryServerInterceptors(grpcUnaryServerInterceptors ...grpc.UnarySe
 	return option(func(o *options) {
 		o.grpcUnaryServerInterceptors = append(o.grpcUnaryServerInterceptors, grpcUnaryServerInterceptors...)
 	})
+}
+
+type EntrypointOption interface {
+	apply(*options)
 }
