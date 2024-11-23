@@ -12,7 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	grpcconfig "github.com/arrowwhi/go-utils/grpcserver/config"
+	"github.com/arrowwhi/go-utils/grpcserver/grpc_config"
 )
 
 type Server struct {
@@ -20,10 +20,10 @@ type Server struct {
 	metricsPort string
 	logger      *zap.Logger
 	grpcServer  *grpc.Server
-	config      grpcconfig.Config
+	config      grpc_config.Config
 }
 
-func NewServer(serverConfig grpcconfig.Config, logger *zap.Logger, opts ...EntrypointOption) (*Server, error) {
+func NewServer(serverConfig grpc_config.Config, logger *zap.Logger, opts ...EntrypointOption) (*Server, error) {
 	o := options{}
 
 	for _, opt := range opts {

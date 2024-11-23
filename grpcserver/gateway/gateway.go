@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	grpc_config "github.com/arrowwhi/go-utils/grpcserver/config"
+	"github.com/arrowwhi/go-utils/grpcserver/grpc_config"
 	"net/http"
 	"time"
 

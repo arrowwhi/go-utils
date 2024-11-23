@@ -1,7 +1,7 @@
 package config
 
 import (
-	grpc_config "github.com/arrowwhi/go-utils/grpcserver/config"
+	"github.com/arrowwhi/go-utils/grpcserver/grpc_config"
 )
 
 type Config struct {
