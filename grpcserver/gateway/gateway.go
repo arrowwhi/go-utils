@@ -59,7 +59,12 @@ func (g *Gateway) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	//closer.Add(conn.Close) todo
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			g.logger.Error("failed to close gRPC connection", zap.Error(err))
+		}
+	}(conn)
 
 	gwmux := runtime.NewServeMux(
 	//opts...,
