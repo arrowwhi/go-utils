@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"github.com/Masterminds/squirrel"
 	"github.com/arrowwhi/go-utils/postgres/db_config"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -10,7 +11,8 @@ import (
 )
 
 type Database struct {
-	Pool *pgxpool.Pool
+	Pool    *pgxpool.Pool
+	Builder squirrel.StatementBuilderType
 }
 
 // NewDatabase создает новое подключение к базе данных с базовыми настройками и опциями
@@ -35,7 +37,9 @@ func NewDatabase(cfg db_config.DBConfig, opts ...Option) (*Database, error) {
 		return nil, err
 	}
 
-	return &Database{Pool: pool}, nil
+	builder := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
+
+	return &Database{Pool: pool, Builder: builder}, nil
 }
 
 // Close закрывает пул соединений к базе данных
