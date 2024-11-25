@@ -1,7 +1,7 @@
 package grpc_config
 
 type Config struct {
-	ServiceName string `envconfig:"NAME" required:"true"`
+	ServiceName string `envconfig:"SERVICE_NAME" required:"true"`
 	Version     string `envconfig:"VERSION" required:"true"`
 
 	GRPCPort       string `envconfig:"GRPC_PORT" default:"50051"`
