@@ -6,6 +6,15 @@ vars:
   DB_STRING: "postgres://test:test@localhost:5432/test?sslmode=disable"
 
 tasks:
+  run:
+    cmds:
+      - |
+        GOROOT=/opt/homebrew/opt/go/libexec #gosetup
+        GOPATH=/Users/ivan/go #gosetup
+        /opt/homebrew/opt/go/libexec/bin/go build -o /Users/ivan/Projects/Golang/go-utils/grpcclient/golang/golang_test github.com/arrowwhi/go-utils/grpcserver/test #gosetup
+        /Users/ivan/Projects/Golang/go-utils/grpcclient/golang/golang_test
+
+
   generate-proto:
     desc: Генерация Go-кода из .proto файлов
     cmds:
