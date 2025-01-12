@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -27,6 +28,11 @@ type ClientOption func(*Client)
 // MethodHandler определяет обработчик метода gRPC
 type MethodHandler func(ctx context.Context, req interface{}) (interface{}, error)
 
+type Config struct {
+	Host string
+	Port int
+}
+
 // NewClient создает новый gRPC клиент
 func NewClient(target string, opts ...ClientOption) (*Client, error) {
 	c := &Client{
@@ -43,14 +49,19 @@ func NewClient(target string, opts ...ClientOption) (*Client, error) {
 
 	// Создаем соединение с дополнительными опциями
 	var err error
-	c.conn, err = grpc.Dial(
+	c.conn, err = grpc.NewClient(
 		target,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка создания соединения: %w", err)
+	}
+
+	// Проверяем состояние соединения
+	if c.conn.GetState() != connectivity.Ready {
+		c.Close() // Закрываем соединение, если оно не установлено
+		return nil, fmt.Errorf("соединение не готово, текущее состояние: %v", c.conn.GetState())
 	}
 
 	return c, nil
