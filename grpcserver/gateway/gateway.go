@@ -99,7 +99,11 @@ func (g *Gateway) Start(ctx context.Context) error {
 
 	g.logger.Info(fmt.Sprintf("gRPC GW starting on address - %s", g.ServerConfig.GatewayPort))
 
-	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := httpServer.ListenAndServe(); err != nil {
+		if !errors.Is(err, http.ErrServerClosed) {
+			g.logger.Error(fmt.Sprintf("failed to start http gateway server: %v", err))
+			return err
+		}
 		g.logger.Error(fmt.Sprintf("failed to start http gateway server: %v", err))
 		return err
 	}
