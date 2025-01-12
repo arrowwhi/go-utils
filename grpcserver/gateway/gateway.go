@@ -55,7 +55,7 @@ func WithDialOptions(dialOpts ...grpc.DialOption) Option {
 
 // Start launches the HTTP gateway server.
 func (g *Gateway) Start(ctx context.Context) error {
-	conn, err := grpc.NewClient(fmt.Sprintf("0.0.0.0:%s", g.ServerConfig.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(fmt.Sprintf("localhost:%s", g.ServerConfig.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return err
 	}
