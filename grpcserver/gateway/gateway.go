@@ -92,7 +92,7 @@ func (g *Gateway) Start(ctx context.Context) error {
 	)
 
 	httpServer := &http.Server{
-		Addr:              fmt.Sprintf("0.0.0.0:%s", g.ServerConfig.GatewayPort),
+		Addr:              fmt.Sprintf("localhost:%s", g.ServerConfig.GatewayPort),
 		Handler:           httpHandler,
 		ReadHeaderTimeout: time.Minute,
 	}
